@@ -353,11 +353,11 @@ class EmbyUpcomingMediaSensor(Entity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-
+        
         attributes = {}
         default = OTHER_DEFAULT
         card_json = []
-
+    
         if len(self.data) == 0:
             return attributes
         elif self.data[0]["Type"] == "Episode":
@@ -366,55 +366,49 @@ class EmbyUpcomingMediaSensor(Entity):
             return self.handle_tv_show()
         elif self.data[0]["Type"] == "Movie":
             return self.handle_movie()
-        elif self.data[0]["Type"] == "MusicAlbum" or "Audio":
+        elif self.data[0]["Type"] in ["MusicAlbum", "Audio"]:
             return self.handle_music()
         else:
             card_json.append(default)
-
-            # for show in self.data[self._category_id]:
+    
             for show in self.data:
-
                 card_item = {}
-                card_item["title"] = show["Name"]
+                card_item["title"] = show.get("Name", "")
                 card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
                 card_item["episode"] = show.get("OfficialRating", "")
                 card_item["officialrating"] = show.get("OfficialRating", "")
-
+    
                 if "Genres" in show:
                     card_item["genres"] = ", ".join(show["Genres"][:3])
-
+    
                 if "RunTimeTicks" in show:
                     timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
                     card_item["runtime"] = timeobject.total_seconds() / 60
                 else:
                     card_item["runtime"] = ""
-
+    
                 if "Artists" in show and len(show["Artists"]) > 0:
                     card_item["studio"] = ", ".join(show["Artists"][:3])
-
+    
                 if "ParentIndexNumber" in show and "IndexNumber" in show:
-                    card_item["number"] = "S{:02d}E{:02d}".format(
-                        show["ParentIndexNumber"], show["IndexNumber"]
-                    )
+                    card_item["number"] = "S{:02d}E{:02d}".format(show["ParentIndexNumber"], show["IndexNumber"])
                 else:
                     card_item["number"] = show.get("ProductionYear", "")
-
+    
                 card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                    show["Id"], "Primary"
+                    show.get("Id", ""), "Primary"
                 )
-
-                card_item["rating"] = "%s %s" % (
-                    "\u2605",  # Star character
-                    show.get("CommunityRating", ""),
-                )
+    
+                # ✅ id hinzufügen
                 card_item["id"] = show.get("Id", "")
-
+    
+                card_item["rating"] = f"\u2605 {show.get('CommunityRating','')}"
+    
                 card_json.append(card_item)
-
+    
             attributes["data"] = json.dumps(card_json)
             attributes["attribution"] = ATTRIBUTION
-
+    
         return attributes
 
     def update(self):

@@ -142,7 +142,7 @@ class EmbyUpcomingMediaSensor(Entity):
     def handle_tv_episodes(self):
         attributes = {}
         default = TV_DEFAULT
-        card_json = [default]
+        card_json = []
 
         for show in self.data:
             card_item = {
@@ -164,7 +164,7 @@ class EmbyUpcomingMediaSensor(Entity):
     def handle_tv_show(self):
         attributes = {}
         default = TV_ALTERNATE
-        card_json = [default]
+        card_json = []
 
         for show in self.data:
             card_item = {
@@ -210,7 +210,7 @@ class EmbyUpcomingMediaSensor(Entity):
     def handle_music(self):
         attributes = {}
         default = MUSIC_DEFAULT
-        card_json = [default]
+        card_json = []
 
         for show in self.data:
             card_item = {

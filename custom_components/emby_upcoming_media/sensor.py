@@ -25,7 +25,7 @@ from .client import EmbyClient
 
 __version__ = "0.0.1"
 
-DOMAIN = "emby_upcoming_media 2.0"
+DOMAIN = "emby_upcoming_media"
 DOMAIN_DATA = f"{DOMAIN}_data"
 ATTRIBUTION = "Data is provided by Emby."
 
@@ -128,7 +128,7 @@ class EmbyUpcomingMediaSensor(Entity):
         self.entity_id = sensor.ENTITY_ID_FORMAT.format(
             "emby_latest_"
             + re.sub(r"\_$", "", re.sub(r"\W+", "_", self.category_name)
-            ).lower()
+            ).lower()  # remove special characters
         )
 
     @property
@@ -140,114 +140,281 @@ class EmbyUpcomingMediaSensor(Entity):
         return self._state
 
     def handle_tv_episodes(self):
+        """Return the state attributes."""
+
         attributes = {}
         default = TV_DEFAULT
         card_json = []
 
+        card_json.append(default)
+
         for show in self.data:
-            card_item = {
-                "id": show.get("Id"),
-                "title": show.get("SeriesName"),
-                "episode": show.get("Name", ""),
-                "airdate": show.get("PremiereDate", datetime.now().isoformat()),
-                "release": str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year) if "PremiereDate" in show else "",
-                "runtime": (timedelta(microseconds=show["RunTimeTicks"]/10).total_seconds()/60 if "RunTimeTicks" in show else ""),
-                "number": f"S{show.get('ParentIndexNumber', 0):02d}E{show.get('IndexNumber', 0):02d}" if "ParentIndexNumber" in show and "IndexNumber" in show else f"Season {show.get('ParentIndexNumber', '')} Special",
-                "poster": self._client.get_image_url(show.get("ParentBackdropItemId"), "Backdrop" if self.use_backdrop else "Primary") if "ParentBackdropItemId" in show else ""
-            }
+
+            card_item = {}
+            card_item["title"] = show["SeriesName"]
+            card_item['episode'] = show.get('Name', '')
+
+            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
+
+            if "PremiereDate" in show:
+                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
+            else:
+                card_item["release"] = ""
+
+            if "RunTimeTicks" in show:
+                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
+                card_item["runtime"] = timeobject.total_seconds() / 60
+            else:
+                card_item["runtime"] = ""
+
+            if "ParentIndexNumber" and "IndexNumber" in show:
+                card_item["number"] = "S{:02d}E{:02d}".format(
+                    show["ParentIndexNumber"], show["IndexNumber"]
+                )
+            elif "ParentIndexNumber" in show and "IndexNumber" not in show:
+                card_item["number"] = "Season {:d} Special".format(
+                    show["ParentIndexNumber"]
+                )
+
+            if "ParentBackdropItemId" in show:
+                card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
+                    show["ParentBackdropItemId"], "Backdrop" if self.use_backdrop else "Primary"
+                )
+            card_item["id"] = show.get("Id", "")
+
             card_json.append(card_item)
 
-        attributes["data"] = card_json
+        attributes["data"] = json.dumps(card_json)
         attributes["attribution"] = ATTRIBUTION
+
         return attributes
 
     def handle_tv_show(self):
+        """Return the state attributes."""
+
         attributes = {}
         default = TV_ALTERNATE
         card_json = []
 
+        card_json.append(default)
+
         for show in self.data:
-            card_item = {
-                "id": show.get("Id"),
-                "title": show.get("Name"),
-                "airdate": show.get("PremiereDate", datetime.now().isoformat()),
-                "release": str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year) if "PremiereDate" in show else "",
-                "number": f"{show.get('ChildCount', 1)} season{'s' if show.get('ChildCount',1)>1 else ''}",
-                "runtime": (timedelta(microseconds=show["RunTimeTicks"]/10).total_seconds()/60 if "RunTimeTicks" in show else ""),
-                "genres": ", ".join(show.get("Genres", [])[:3]),
-                "rating": f"\u2605 {show.get('CommunityRating', '')}" if "CommunityRating" in show else "",
-                "poster": self._client.get_image_url(show.get("Id"), "Backdrop" if self.use_backdrop else "Primary")
-            }
+
+            card_item = {}
+            card_item["title"] = show["Name"]
+            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
+
+            if "PremiereDate" in show:
+                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
+
+            if show["ChildCount"] > 1:
+                card_item['number'] = "{0} seasons".format(
+                    show["ChildCount"]
+                )
+            else:
+                card_item['number'] = "{0} season".format(
+                    show["ChildCount"]
+                )
+
+            if "RunTimeTicks" in show:
+                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
+                card_item["runtime"] = timeobject.total_seconds() / 60
+            else:
+                card_item["runtime"] = ""
+
+            if "Genres" in show:
+                card_item["genres"] = ", ".join(show["Genres"][:3])
+
+            if "ParentIndexNumber" and "IndexNumber" in show:
+                card_item["number"] = "S{:02d}E{:02d}".format(
+                    show["ParentIndexNumber"], show["IndexNumber"]
+                )
+
+            if "CommunityRating" in show:
+                card_item["rating"] = "{} {:.1f}".format(
+                    "\u2605", # Star character
+                    show.get("CommunityRating", ''),
+                )
+
+            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
+                show["Id"], "Backdrop" if self.use_backdrop else "Primary"
+                )
+            card_item["id"] = show.get("Id", "")
+
             card_json.append(card_item)
 
-        attributes["data"] = card_json
+        attributes["data"] = json.dumps(card_json)
         attributes["attribution"] = ATTRIBUTION
+
         return attributes
 
     def handle_movie(self):
+        """Return the state attributes."""
+
         attributes = {}
         default = MOVIE_DEFAULT
-        card_json = [default]
+        card_json = []
+
+        card_json.append(default)
 
         for show in self.data:
-            card_item = {
-                "id": show.get("Id"),
-                "title": show.get("Name"),
-                "airdate": show.get("PremiereDate", datetime.now().isoformat()),
-                "release": str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year) if "PremiereDate" in show else "",
-                "runtime": (timedelta(microseconds=show["RunTimeTicks"]/10).total_seconds()/60 if "RunTimeTicks" in show else ""),
-                "genres": ", ".join(show.get("Genres", [])[:3]),
-                "studio": show.get("Studios", [{}])[0].get("Name", "") if "Studios" in show else "",
-                "rating": f"\u2605 {show.get('CommunityRating', '')}" if "CommunityRating" in show else "",
-                "poster": self._client.get_image_url(show.get("Id"), "Backdrop" if self.use_backdrop else "Primary")
-            }
+
+            card_item = {}
+            card_item["title"] = show["Name"]
+            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
+
+            if "PremiereDate" in show:
+                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
+
+            if "RunTimeTicks" in show:
+                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
+                card_item["runtime"] = timeobject.total_seconds() / 60
+            else:
+                card_item["runtime"] = ""
+
+            if "Genres" in show:
+                card_item["genres"] = ", ".join(show["Genres"][:3])
+
+            if "Studios" in show and len(show["Studios"]) > 0:
+                card_item["studio"] = show["Studios"][0]["Name"]
+
+            if "CommunityRating" in show:
+                card_item["rating"] = "{} {:.1f}".format(
+                    "\u2605", # Star character
+                    show.get("CommunityRating", ''),
+                )
+
+            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
+                show["Id"], "Backdrop" if self.use_backdrop else "Primary"
+            )
+            card_item["id"] = show.get("Id", "")
+
             card_json.append(card_item)
 
-        attributes["data"] = card_json
+        attributes["data"] = json.dumps(card_json)
         attributes["attribution"] = ATTRIBUTION
+
         return attributes
 
     def handle_music(self):
+        """Return the state attributes."""
+
         attributes = {}
         default = MUSIC_DEFAULT
         card_json = []
 
+        card_json.append(default)
+
         for show in self.data:
-            card_item = {
-                "id": show.get("Id"),
-                "title": show.get("Name"),
-                "airdate": show.get("PremiereDate", datetime.now().isoformat()),
-                "studio": ", ".join(show.get("Artists", [])[:3]) if "Artists" in show else "",
-                "runtime": (timedelta(microseconds=show["RunTimeTicks"]/10).total_seconds()/60 if "RunTimeTicks" in show else ""),
-                "genres": ", ".join(show.get("Genres", [])[:3]),
-                "release": str(show.get("ProductionYear", "")),
-                "number": f"S{show.get('ParentIndexNumber', 0):02d}E{show.get('IndexNumber', 0):02d}" if "ParentIndexNumber" in show and "IndexNumber" in show else show.get("ProductionYear", ""),
-                "rating": f"\u2605 {show.get('CommunityRating', '')}" if "CommunityRating" in show else "",
-                "poster": self._client.get_image_url(show.get("Id"), "Primary")
-            }
+
+            card_item = {}
+            card_item["title"] = show["Name"]
+            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
+
+            if "Artists" in show and len(show["Artists"]) > 0:
+                card_item["studio"] = ", ".join(show["Artists"][:3])
+
+            if "RunTimeTicks" in show:
+                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
+                card_item["runtime"] = timeobject.total_seconds() / 60
+            else:
+                card_item["runtime"] = ""
+
+            if "Genres" in show:
+                card_item["genres"] = ", ".join(show["Genres"][:3])
+
+            card_item["release"] = str(show.get("ProductionYear", ""))
+            
+            if "ParentIndexNumber" in show and "IndexNumber" in show:
+                card_item["number"] = "S{:02d}E{:02d}".format(
+                    show["ParentIndexNumber"], show["IndexNumber"]
+                )
+            else:
+                card_item["number"] = show.get("ProductionYear", "")
+
+            if "CommunityRating" in show:
+                card_item["rating"] = "{} {:.1f}".format(
+                    "\u2605", # Star character
+                    show.get("CommunityRating", ''),
+                )
+
+            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
+                show["Id"], "Primary"
+            )
+            card_item["id"] = show.get("Id", "")
+
             card_json.append(card_item)
 
-        attributes["data"] = card_json
+        attributes["data"] = json.dumps(card_json)
         attributes["attribution"] = ATTRIBUTION
+
         return attributes
 
     @property
     def extra_state_attributes(self):
-        if not self.data:
-            return {}
+        """Return the state attributes."""
 
-        first_type = self.data[0].get("Type", "")
-        if first_type == "Episode":
+        attributes = {}
+        default = OTHER_DEFAULT
+        card_json = []
+
+        if len(self.data) == 0:
+            return attributes
+        elif self.data[0]["Type"] == "Episode":
             return self.handle_tv_episodes()
-        elif first_type == "Series":
+        elif self.data[0]["Type"] == "Series":
             return self.handle_tv_show()
-        elif first_type == "Movie":
+        elif self.data[0]["Type"] == "Movie":
             return self.handle_movie()
-        elif first_type in ["MusicAlbum", "Audio"]:
+        elif self.data[0]["Type"] == "MusicAlbum" or "Audio":
             return self.handle_music()
         else:
-            attributes = {"data": [], "attribution": ATTRIBUTION}
-            return attributes
+            card_json.append(default)
+
+            # for show in self.data[self._category_id]:
+            for show in self.data:
+
+                card_item = {}
+                card_item["title"] = show["Name"]
+                card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
+
+                card_item["episode"] = show.get("OfficialRating", "")
+                card_item["officialrating"] = show.get("OfficialRating", "")
+
+                if "Genres" in show:
+                    card_item["genres"] = ", ".join(show["Genres"][:3])
+
+                if "RunTimeTicks" in show:
+                    timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
+                    card_item["runtime"] = timeobject.total_seconds() / 60
+                else:
+                    card_item["runtime"] = ""
+
+                if "Artists" in show and len(show["Artists"]) > 0:
+                    card_item["studio"] = ", ".join(show["Artists"][:3])
+
+                if "ParentIndexNumber" in show and "IndexNumber" in show:
+                    card_item["number"] = "S{:02d}E{:02d}".format(
+                        show["ParentIndexNumber"], show["IndexNumber"]
+                    )
+                else:
+                    card_item["number"] = show.get("ProductionYear", "")
+
+                card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
+                    show["Id"], "Primary"
+                )
+
+                card_item["rating"] = "%s %s" % (
+                    "\u2605",  # Star character
+                    show.get("CommunityRating", ""),
+                )
+
+                card_json.append(card_item)
+
+            attributes["data"] = json.dumps(card_json)
+            attributes["attribution"] = ATTRIBUTION
+
+        return attributes
 
     def update(self):
         if isinstance(self.category_id, str): 
@@ -255,13 +422,13 @@ class EmbyUpcomingMediaSensor(Entity):
         else:
             data = []
             for element in self.category_id:
-                data.extend(self._client.get_data(element))
-            data.sort(key=lambda item: item.get('DateCreated', ""), reverse=True)
+                for res in self._client.get_data(element):
+                    data.append(res)
+            data.sort(key=lambda item:item['DateCreated'], reverse=True) #as we added all libraries we now resort to get the newest at top
 
         if data is not None:
             self._state = "Online"
             self.data = data
         else:
             self._state = "error"
-            _LOGGER.error("Failed to fetch Emby data for category %s", self.category_name)
-
+            _LOGGER.error("ERROR")

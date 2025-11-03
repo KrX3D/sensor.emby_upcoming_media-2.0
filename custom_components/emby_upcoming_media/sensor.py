@@ -375,6 +375,7 @@ class EmbyUpcomingMediaSensor(Entity):
             for show in self.data:
 
                 card_item = {}
+                card_item["id"] = show["Id"]
                 card_item["title"] = show["Name"]
                 card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
 

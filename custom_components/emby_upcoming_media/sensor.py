@@ -1,10 +1,8 @@
 """
-Home Assistant component to feed the Upcoming Media Lovelace card with
+Home Assistant component to feed the Emby Mediarr card with
 Emby Latest Media.
 
-https://github.com/gcorgnet/sensor.emby_upcoming_media
-
-https://github.com/custom-cards/upcoming-media-card
+https://github.com/gcorgnet/sensor.emby_upcoming_media 2.0
 
 """
 import logging
@@ -27,7 +25,7 @@ from .client import EmbyClient
 
 __version__ = "0.0.1"
 
-DOMAIN = "emby_upcoming_media"
+DOMAIN = "emby_upcoming_media 2.0"
 DOMAIN_DATA = f"{DOMAIN}_data"
 ATTRIBUTION = "Data is provided by Emby."
 

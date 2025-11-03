@@ -1,7 +1,7 @@
 {
-  "domain": "emby_upcoming_media",
-  "name": "Emby Latest Media",
-  "documentation": "https://github.com/gcorgnet/sensor.emby_upcoming_media",
+  "domain": "emby_upcoming_media 2.0",
+  "name": "Emby Latest Media 2.0",
+  "documentation": "https://github.com/Stefan765/sensor.emby_upcoming_media-2.0",
   "dependencies": [],
   "codeowners": [
     "@gcorgnet", "@xlyralycanx"

@@ -151,7 +151,6 @@ class EmbyUpcomingMediaSensor(Entity):
         for show in self.data:
 
             card_item = {}
-            card_item["id"] = show.get("Id", "")
             card_item["title"] = show["SeriesName"]
             card_item['episode'] = show.get('Name', '')
 
@@ -181,6 +180,7 @@ class EmbyUpcomingMediaSensor(Entity):
                 card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                     show["ParentBackdropItemId"], "Backdrop" if self.use_backdrop else "Primary"
                 )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -201,7 +201,6 @@ class EmbyUpcomingMediaSensor(Entity):
         for show in self.data:
 
             card_item = {}
-            card_item["id"] = show.get("Id", "")
             card_item["title"] = show["Name"]
             card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
 
@@ -240,6 +239,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"
                 )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -260,7 +260,6 @@ class EmbyUpcomingMediaSensor(Entity):
         for show in self.data:
 
             card_item = {}
-            card_item["id"] = show.get("Id", "")
             card_item["title"] = show["Name"]
             card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
 
@@ -288,6 +287,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -308,7 +308,6 @@ class EmbyUpcomingMediaSensor(Entity):
         for show in self.data:
 
             card_item = {}
-            card_item["id"] = show.get("Id", "")
             card_item["title"] = show["Name"]
             card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
 
@@ -342,6 +341,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Primary"
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -375,7 +375,6 @@ class EmbyUpcomingMediaSensor(Entity):
             for show in self.data:
 
                 card_item = {}
-                card_item["id"] = show.get("Id", "")
                 card_item["title"] = show["Name"]
                 card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
 
@@ -409,6 +408,7 @@ class EmbyUpcomingMediaSensor(Entity):
                     "\u2605",  # Star character
                     show.get("CommunityRating", ""),
                 )
+                card_item["id"] = show.get("Id", "")
 
                 card_json.append(card_item)
 

@@ -274,6 +274,11 @@ class EmbyUpcomingMediaSensor(Entity):
     
             if "Studios" in show and len(show["Studios"]) > 0:
                 card_item["studio"] = show["Studios"][0]["Name"]
+
+            if "Overview" in show and show["Overview"]:
+                card_item["description"] = show["Overview"]  # ✅ Beschreibung hinzufügen
+            else:
+                card_item["description"] = ""
     
             if "CommunityRating" in show:
                 card_item["rating"] = "{} {:.1f}".format(

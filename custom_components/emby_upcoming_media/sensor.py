@@ -238,6 +238,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"
                 )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -285,6 +286,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -338,6 +340,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Primary"
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 

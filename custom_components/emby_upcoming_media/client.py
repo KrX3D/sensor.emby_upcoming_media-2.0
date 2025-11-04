@@ -44,7 +44,7 @@ class EmbyClient:
 
     def get_data(self, categoryId):
         try:
-            url = "http{0}://{1}:{2}/Users/{3}/Items/Latest?Limit={4}&Fields=CommunityRating,Studios,PremiereDate,Genres,ChildCount,ProductionYear,DateCreated&ParentId={5}&api_key={6}{7}".format(
+            url = "http{0}://{1}:{2}/Users/{3}/Items/Latest?Limit={4}&Fields=CommunityRating,Studios,PremiereDate,Genres,ChildCount,ProductionYear,DateCreated,Overview,RemoteTrailers,Path&ParentId={5}&api_key={6}{7}".format(
                 self.ssl,
                 self.host,
                 self.port,

@@ -204,6 +204,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["deep_link"] = "{0}/web/index.html#!/details?id={1}".format(
                 base_url, show["Id"]
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -284,6 +285,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["deep_link"] = "{0}/web/index.html#!/details?id={1}".format(
                 base_url, show["Id"]
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 
@@ -353,6 +355,7 @@ class EmbyUpcomingMediaSensor(Entity):
             card_item["deep_link"] = "{0}/web/index.html#!/details?id={1}".format(
                 base_url, show["Id"]
             )
+            card_item["id"] = show.get("Id", "")
 
             card_json.append(card_item)
 

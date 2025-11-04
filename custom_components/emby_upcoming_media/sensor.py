@@ -1,433 +1,124 @@
-"""
-Home Assistant component to feed the Emby Mediarr card with
-Emby Latest Media.
+"""Platform for sensor integration."""
+from __future__ import annotations
 
-https://github.com/Stefan765/sensor.emby_upcoming_media-2.0
-
-"""
 import logging
-import json
-import time
-import re
-import requests
-import dateutil.parser
-from datetime import date, datetime
-from datetime import timedelta
 import voluptuous as vol
-from itertools import groupby
 import homeassistant.helpers.config_validation as cv
+
+from pprint import pformat
+
+from homeassistant.components.sensor import SensorEntity
+
+# from homeassistant.const import TEMP_CELSIUS
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.components import sensor
-from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_SSL
-from homeassistant.helpers.entity import Entity
+from homeassistant.const import (
+    CONF_NAME,
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    CONF_IP_ADDRESS,
+    CONF_AUTHENTICATION,
+    CONF_ID,
+    CONF_UNIT_OF_MEASUREMENT,
+    CONF_DEVICE_CLASS,
+    CONF_UNIQUE_ID,
+    CONF_SCAN_INTERVAL,
+)
 
-from .client import EmbyClient
+from . import DOMAIN
 
-__version__ = "0.0.1"
+import ochsner_web2com.web2com as web2com
 
-DOMAIN = "emby_upcoming_media"
-DOMAIN_DATA = f"{DOMAIN}_data"
-ATTRIBUTION = "Data is provided by Emby."
+_LOGGER = logging.getLogger("web2com")
 
-DICT_LIBRARY_TYPES = {"tvshows": "TV Shows", "movies": "Movies", "music": "Music"}
-
-# Configuration
-CONF_SENSOR = "sensor"
-CONF_ENABLED = "enabled"
-CONF_NAME = "name"
-CONF_INCLUDE = "include"
-CONF_MAX = "max"
-CONF_USER_ID = "user_id"
-CONF_USE_BACKDROP = "use_backdrop"
-CONF_GROUP_LIBRARIES = "group_libraries"
-CONF_EPISODES = "episodes"
-
-CATEGORY_NAME = "CategoryName"
-CATEGORY_ID = "CategoryId"
-CATEGORY_TYPE = "CollectionType"
-
-
-SCAN_INTERVAL_SECONDS = 3600  # Scan once per hour
-
-TV_DEFAULT = {"title_default": "$title", "line1_default": "$release", "line2_default": "$number", "line3_default": "$episode", "line4_default": "Runtime: $runtime", "icon": "mdi:arrow-down-bold"}
-TV_ALTERNATE = {"title_default": "$title", "line1_default": "$release • $number", "line2_default": "Average Runtime: $runtime", "line3_default": "$genres", "line4_default": "$rating", "icon": "mdi:arrow-down-bold"}
-MOVIE_DEFAULT = {"title_default": "$title", "line1_default": "$release", "line2_default": "Runtime: $runtime", "line3_default": "$genres", "line4_default": "$rating", "icon": "mdi:arrow-down-bold"}
-MUSIC_DEFAULT = {"title_default": "$title", "line1_default": "$studio • $release", "line2_default": "Runtime: $runtime", "line3_default": "$genres", "line4_default": "", "icon": "mdi:arrow-down-bold"}
-OTHER_DEFAULT = {"title_default": "$title", "line1_default": "$release", "line2_default": "Runtime: $runtime", "line3_default": "$genres", "line4_default": "$studio", "icon": "mdi:arrow-down-bold"}
-
-_LOGGER = logging.getLogger(__name__)
-
+# Validation of the user's configuration
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Optional(CONF_API_KEY): cv.string,
-        vol.Optional(CONF_USER_ID): cv.string,
-        vol.Optional(CONF_HOST, default="localhost"): cv.string,
-        vol.Optional(CONF_PORT, default=8096): cv.port,
-        vol.Optional(CONF_SSL, default=False): cv.boolean,
-        vol.Optional(CONF_INCLUDE, default=[]): vol.All(cv.ensure_list),
-        vol.Optional(CONF_MAX, default=5): cv.Number,
-        vol.Optional(CONF_USE_BACKDROP, default=False): cv.boolean,
-        vol.Optional(CONF_GROUP_LIBRARIES, default=False): cv.boolean,
-        vol.Optional(CONF_EPISODES, default=True): cv.boolean
+        vol.Required(CONF_NAME): cv.string,
     }
 )
 
 
-def setup_platform(hass, config, add_devices, discovery_info=None):
+def setup_platform(
+    hass: HomeAssistant,
+    config: ConfigType,
+    add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
+) -> None:
+    """Set up the sensor platform."""
 
-    # Create DATA dict
-    hass.data[DOMAIN_DATA] = {}
+    # We only want this platform to be set up via discovery.
+    if discovery_info is None:
+        return
 
-    # Get "global" configuration.
-    api_key = config.get(CONF_API_KEY)
-    host = config.get(CONF_HOST)
-    ssl = config.get(CONF_SSL)
-    port = config.get(CONF_PORT)
-    max_items = config.get(CONF_MAX)
-    user_id = config.get(CONF_USER_ID)
-    include = config.get(CONF_INCLUDE)
-    show_episodes = config.get(CONF_EPISODES)
-
-    # Configure the client.
-    client = EmbyClient(host, api_key, ssl, port, max_items, user_id, show_episodes)
-    hass.data[DOMAIN_DATA]["client"] = client
-
-    categories = client.get_view_categories()
-    
-    categories = filter(lambda el: 'CollectionType' in el.keys() and el["CollectionType"] in DICT_LIBRARY_TYPES.keys(), categories) #just include supported library types (movie/tv)
-
-    if include != []:
-        categories = filter(lambda el: el["Name"] in include, categories)
-            
-    if config.get(CONF_GROUP_LIBRARIES) == True:
-        l=[list(y) for x,y in groupby(sorted(list(categories),key=lambda x: (x['CollectionType'])),lambda x: (x['CollectionType']))]
-        categories = [{k:(v if k!='Id' else list(set([x['Id'] for x in i]))) for k,v in i[0].items()} for i in l]
-
-    mapped = map(
-        lambda cat: EmbyUpcomingMediaSensor(
-            hass, {**config, CATEGORY_NAME: cat["Name"], CATEGORY_ID: cat["Id"], CATEGORY_TYPE: DICT_LIBRARY_TYPES[cat["CollectionType"]]}
-        ),
-        categories,
-    )
-
-    add_devices(mapped, True)
+    add_entities([ExampleSensor(discovery_info)])
 
 
-SCAN_INTERVAL = timedelta(seconds=SCAN_INTERVAL_SECONDS)
+class ExampleSensor(SensorEntity):
+    """Representation of a sensor."""
 
-
-class EmbyUpcomingMediaSensor(Entity):
-    def __init__(self, hass, conf):
-        self._client = hass.data[DOMAIN_DATA]["client"]
+    def __init__(self, discovery_info) -> None:
+        """Initialize the sensor."""
         self._state = None
-        self.data = []
-        self.use_backdrop = conf.get(CONF_USE_BACKDROP)
-        self.category_name = (conf.get(CATEGORY_TYPE) if conf.get(CONF_GROUP_LIBRARIES) == True else conf.get(CATEGORY_NAME))
-        self.category_id = conf.get(CATEGORY_ID)
-        self.friendly_name = "Emby Latest Media " + self.category_name
-        self.entity_id = sensor.ENTITY_ID_FORMAT.format(
-            "emby_latest_"
-            + re.sub(r"\_$", "", re.sub(r"\W+", "_", self.category_name)
-            ).lower()  # remove special characters
-        )
+        self._name = discovery_info[CONF_NAME]
+        self._password = discovery_info[CONF_PASSWORD]
+        self._username = discovery_info[CONF_USERNAME]
+        self._ip_address = discovery_info[CONF_IP_ADDRESS]
+        self._id = discovery_info[CONF_ID]
+        self._unit_of_measurement = discovery_info[CONF_UNIT_OF_MEASUREMENT]
+        self._device_class = discovery_info[CONF_DEVICE_CLASS]
+        self._unique_id = discovery_info[CONF_UNIQUE_ID]
+        self._scan_interval = discovery_info[CONF_SCAN_INTERVAL]
+
+        self._authentication = web2com.AUTH.DIGEST
+        try:
+            if discovery_info[CONF_AUTHENTICATION] == "Basic":
+                self._authentication = web2com.AUTH.BASIC
+        except:
+            self._authentication = web2com.AUTH.DIGEST
 
     @property
-    def name(self):
-        return "Latest {0} on Emby".format(self.category_name)
+    def id(self) -> str:
+        """Return the id of the sensor."""
+        return self._id
+
+    @property
+    def device_class(self) -> str:
+        """Return the device class of the sensor."""
+        return self._device_class
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        return self._name
 
     @property
     def state(self):
+        """Return the state of the sensor."""
         return self._state
 
-    def handle_tv_episodes(self):
-        """Return the state attributes."""
-
-        attributes = {}
-        default = TV_DEFAULT
-        card_json = []
-
-        card_json.append(default)
-
-        for show in self.data:
-
-            card_item = {}
-            card_item["title"] = show["SeriesName"]
-            card_item['episode'] = show.get('Name', '')
-
-            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
-            if "PremiereDate" in show:
-                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
-            else:
-                card_item["release"] = ""
-
-            if "RunTimeTicks" in show:
-                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
-                card_item["runtime"] = timeobject.total_seconds() / 60
-            else:
-                card_item["runtime"] = ""
-
-            if "ParentIndexNumber" and "IndexNumber" in show:
-                card_item["number"] = "S{:02d}E{:02d}".format(
-                    show["ParentIndexNumber"], show["IndexNumber"]
-                )
-            elif "ParentIndexNumber" in show and "IndexNumber" not in show:
-                card_item["number"] = "Season {:d} Special".format(
-                    show["ParentIndexNumber"]
-                )
-
-            if "ParentBackdropItemId" in show:
-                card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                    show["ParentBackdropItemId"], "Backdrop" if self.use_backdrop else "Primary"
-                )
-
-            card_json.append(card_item)
-
-        attributes["data"] = json.dumps(card_json)
-        attributes["attribution"] = ATTRIBUTION
-
-        return attributes
-
-    def handle_tv_show(self):
-        """Return the state attributes."""
-
-        attributes = {}
-        default = TV_ALTERNATE
-        card_json = []
-
-        card_json.append(default)
-
-        for show in self.data:
-
-            card_item = {}
-            card_item["title"] = show["Name"]
-            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
-            if "PremiereDate" in show:
-                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
-
-            if show["ChildCount"] > 1:
-                card_item['number'] = "{0} seasons".format(
-                    show["ChildCount"]
-                )
-            else:
-                card_item['number'] = "{0} season".format(
-                    show["ChildCount"]
-                )
-
-            if "RunTimeTicks" in show:
-                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
-                card_item["runtime"] = timeobject.total_seconds() / 60
-            else:
-                card_item["runtime"] = ""
-
-            if "Genres" in show:
-                card_item["genres"] = ", ".join(show["Genres"][:3])
-
-            if "ParentIndexNumber" and "IndexNumber" in show:
-                card_item["number"] = "S{:02d}E{:02d}".format(
-                    show["ParentIndexNumber"], show["IndexNumber"]
-                )
-
-            if "CommunityRating" in show:
-                card_item["rating"] = "{} {:.1f}".format(
-                    "\u2605", # Star character
-                    show.get("CommunityRating", ''),
-                )
-
-            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                show["Id"], "Backdrop" if self.use_backdrop else "Primary"
-                )
-            card_item["id"] = show.get("Id", "")
-
-            card_json.append(card_item)
-
-        attributes["data"] = json.dumps(card_json)
-        attributes["attribution"] = ATTRIBUTION
-
-        return attributes
-
-    def handle_movie(self):
-        """Return the state attributes."""
-
-        attributes = {}
-        default = MOVIE_DEFAULT
-        card_json = []
-
-        card_json.append(default)
-
-        for show in self.data:
-
-            card_item = {}
-            card_item["title"] = show["Name"]
-            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
-            if "PremiereDate" in show:
-                card_item["release"] = str(dateutil.parser.isoparse(show.get("PremiereDate", "")).year)
-
-            if "RunTimeTicks" in show:
-                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
-                card_item["runtime"] = timeobject.total_seconds() / 60
-            else:
-                card_item["runtime"] = ""
-
-            if "Genres" in show:
-                card_item["genres"] = ", ".join(show["Genres"][:3])
-
-            if "Studios" in show and len(show["Studios"]) > 0:
-                card_item["studio"] = show["Studios"][0]["Name"]
-
-            if "CommunityRating" in show:
-                card_item["rating"] = "{} {:.1f}".format(
-                    "\u2605", # Star character
-                    show.get("CommunityRating", ''),
-                )
-
-            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                show["Id"], "Backdrop" if self.use_backdrop else "Primary"
-            )
-            card_item["id"] = show.get("Id", "")
-
-            card_json.append(card_item)
-
-        attributes["data"] = json.dumps(card_json)
-        attributes["attribution"] = ATTRIBUTION
-
-        return attributes
-
-    def handle_music(self):
-        """Return the state attributes."""
-
-        attributes = {}
-        default = MUSIC_DEFAULT
-        card_json = []
-
-        card_json.append(default)
-
-        for show in self.data:
-
-            card_item = {}
-            card_item["title"] = show["Name"]
-            card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
-            if "Artists" in show and len(show["Artists"]) > 0:
-                card_item["studio"] = ", ".join(show["Artists"][:3])
-
-            if "RunTimeTicks" in show:
-                timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
-                card_item["runtime"] = timeobject.total_seconds() / 60
-            else:
-                card_item["runtime"] = ""
-
-            if "Genres" in show:
-                card_item["genres"] = ", ".join(show["Genres"][:3])
-
-            card_item["release"] = str(show.get("ProductionYear", ""))
-            
-            if "ParentIndexNumber" in show and "IndexNumber" in show:
-                card_item["number"] = "S{:02d}E{:02d}".format(
-                    show["ParentIndexNumber"], show["IndexNumber"]
-                )
-            else:
-                card_item["number"] = show.get("ProductionYear", "")
-
-            if "CommunityRating" in show:
-                card_item["rating"] = "{} {:.1f}".format(
-                    "\u2605", # Star character
-                    show.get("CommunityRating", ''),
-                )
-
-            card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                show["Id"], "Primary"
-            )
-            card_item["id"] = show.get("Id", "")
-
-            card_json.append(card_item)
-
-        attributes["data"] = json.dumps(card_json)
-        attributes["attribution"] = ATTRIBUTION
-
-        return attributes
+    @property
+    def unique_id(self) -> str:
+        """Return the entity_id of the sensor."""
+        return self._unique_id
 
     @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
+    def scan_interval(self) -> str:
+        """Return the scan_interval of the sensor."""
+        return self._scan_interval
 
-        attributes = {}
-        default = OTHER_DEFAULT
-        card_json = []
+    @property
+    def unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        return self._unit_of_measurement
 
-        if len(self.data) == 0:
-            return attributes
-        elif self.data[0]["Type"] == "Episode":
-            return self.handle_tv_episodes()
-        elif self.data[0]["Type"] == "Series":
-            return self.handle_tv_show()
-        elif self.data[0]["Type"] == "Movie":
-            return self.handle_movie()
-        elif self.data[0]["Type"] == "MusicAlbum" or "Audio":
-            return self.handle_music()
-        else:
-            card_json.append(default)
+    def update(self) -> None:
+        """Fetch new state data for the sensor.
 
-            # for show in self.data[self._category_id]:
-            for show in self.data:
-
-                card_item = {}
-                card_item["title"] = show["Name"]
-                card_item["airdate"] = show.get("PremiereDate", datetime.now().isoformat())
-
-                card_item["episode"] = show.get("OfficialRating", "")
-                card_item["officialrating"] = show.get("OfficialRating", "")
-
-                if "Genres" in show:
-                    card_item["genres"] = ", ".join(show["Genres"][:3])
-
-                if "RunTimeTicks" in show:
-                    timeobject = timedelta(microseconds=show["RunTimeTicks"] / 10)
-                    card_item["runtime"] = timeobject.total_seconds() / 60
-                else:
-                    card_item["runtime"] = ""
-
-                if "Artists" in show and len(show["Artists"]) > 0:
-                    card_item["studio"] = ", ".join(show["Artists"][:3])
-
-                if "ParentIndexNumber" in show and "IndexNumber" in show:
-                    card_item["number"] = "S{:02d}E{:02d}".format(
-                        show["ParentIndexNumber"], show["IndexNumber"]
-                    )
-                else:
-                    card_item["number"] = show.get("ProductionYear", "")
-
-                card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
-                    show["Id"], "Primary"
-                )
-
-                card_item["rating"] = "%s %s" % (
-                    "\u2605",  # Star character
-                    show.get("CommunityRating", ""),
-                )
-
-                card_json.append(card_item)
-
-            attributes["data"] = json.dumps(card_json)
-            attributes["attribution"] = ATTRIBUTION
-
-        return attributes
-
-    def update(self):
-        if isinstance(self.category_id, str): 
-            data = self._client.get_data(self.category_id)
-        else:
-            data = []
-            for element in self.category_id:
-                for res in self._client.get_data(element):
-                    data.append(res)
-            data.sort(key=lambda item:item['DateCreated'], reverse=True) #as we added all libraries we now resort to get the newest at top
-
-        if data is not None:
-            self._state = "Online"
-            self.data = data
-        else:
-            self._state = "error"
-            _LOGGER.error("ERROR")
+        This is the only method that should fetch new data for Home Assistant.
+        """
+        w2c = web2com.Service(self._ip_address, self._username, self._password, auth=self._authentication)
+        result = w2c.get_value(self._id)
+        self._state = result[1]

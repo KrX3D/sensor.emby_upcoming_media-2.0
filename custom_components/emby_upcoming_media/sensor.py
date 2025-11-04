@@ -235,6 +235,8 @@ class EmbyUpcomingMediaSensor(Entity):
                     "\u2605", # Star character
                     show.get("CommunityRating", ''),
                 )
+            # Neu: Filmbeschreibung (Summary)
+            card_item["summary"] = show.get("Overview", "Keine Beschreibung verfügbar.")
 
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"
@@ -283,6 +285,9 @@ class EmbyUpcomingMediaSensor(Entity):
                     "\u2605", # Star character
                     show.get("CommunityRating", ''),
                 )
+
+            # Neu: Filmbeschreibung (Summary)
+            card_item["summary"] = show.get("Overview", "Keine Beschreibung verfügbar.")
 
             card_item["poster"] = self.hass.data[DOMAIN_DATA]["client"].get_image_url(
                 show["Id"], "Backdrop" if self.use_backdrop else "Primary"

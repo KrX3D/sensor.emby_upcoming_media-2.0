@@ -2,7 +2,7 @@
 Home Assistant component to feed the Emby Mediarr card with
 Emby Latest Media.
 
-https://github.com/gcorgnet/sensor.emby_upcoming_media 2.0
+https://github.com/Stefan765/sensor.emby_upcoming_media-2.0
 
 """
 import logging

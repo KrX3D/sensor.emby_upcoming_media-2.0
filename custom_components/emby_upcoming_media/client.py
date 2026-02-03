@@ -31,16 +31,15 @@ class EmbyClient:
         except OSError:
             _LOGGER.warning("Host %s is not available", self.host)
             self._state = "%s cannot be reached" % self.host
-            return
+            return []
 
         if api.status_code == 200:
             self.data["ViewCategories"] = api.json()["Items"]
+            return self.data["ViewCategories"]
 
-        else:
-            _LOGGER.info("Could not reach url %s", url)
-            self._state = "%s cannot be reached" % self.host
-
-        return self.data["ViewCategories"]
+        _LOGGER.info("Could not reach url %s", url)
+        self._state = "%s cannot be reached" % self.host
+        return []
 
     def get_data(self, categoryId):
         try:

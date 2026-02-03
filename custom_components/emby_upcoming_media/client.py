@@ -9,7 +9,17 @@ _LOGGER = logging.getLogger(__name__)
 class EmbyClient:
     """Client class"""
 
-    def __init__(self, host, api_key, ssl, port, max_items, user_id, show_episodes):
+    def __init__(
+        self,
+        host,
+        api_key,
+        ssl,
+        port,
+        max_items,
+        user_id,
+        show_episodes,
+        suppress_connection_errors,
+    ):
         """Init."""
         self.data = {}
         self.host = host
@@ -19,6 +29,7 @@ class EmbyClient:
         self.user_id = user_id
         self.max_items = max_items
         self.show_episodes = "&GroupItems=False" if show_episodes else ""
+        self.suppress_connection_errors = suppress_connection_errors
 
     def get_view_categories(self):
         """This will pull the list of all View Categories on Emby"""
@@ -29,7 +40,8 @@ class EmbyClient:
             _LOGGER.info("Making API call on URL %s", url)
             api = requests.get(url, timeout=10)
         except OSError:
-            _LOGGER.warning("Host %s is not available", self.host)
+            if not self.suppress_connection_errors:
+                _LOGGER.warning("Host %s is not available", self.host)
             self._state = "%s cannot be reached" % self.host
             return []
 
@@ -56,7 +68,8 @@ class EmbyClient:
             _LOGGER.info("Making API call on URL %s", url)
             api = requests.get(url, timeout=10)
         except OSError:
-            _LOGGER.warning("Host %s is not available", self.host)
+            if not self.suppress_connection_errors:
+                _LOGGER.warning("Host %s is not available", self.host)
             self._state = "%s cannot be reached" % self.host
             return
 

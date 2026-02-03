@@ -49,6 +49,7 @@ Your contributions help maintain and improve the project.
 | include          |           | no       | Names of libraries to include; creates separate sensors per library if not set |
 | group_libraries  | false     | no       | Group movies and TV into two sensors (`emby_movies_entity` / `emby_series_entity`) |
 | episodes         | true      | no       | Show episodes (TV) or songs (Music); false shows seasons/albums |
+| suppress_connection_errors | false | no | Suppress log messages when the Emby server is unavailable |
 
 ---
 
@@ -66,6 +67,7 @@ sensor:
  use_backdrop: true
  group_libraries: false
  episodes: false
+ suppress_connection_errors: false
  include:
    - Movies
    - Kids Movies

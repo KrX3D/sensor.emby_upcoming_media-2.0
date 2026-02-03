@@ -41,7 +41,7 @@ class EmbyClient:
             api = requests.get(url, timeout=10)
         except OSError:
             if not self.suppress_connection_errors:
-                _LOGGER.info("Host %s is not available", self.host)
+                _LOGGER.warning("Host %s is not available", self.host)
             self._state = "%s cannot be reached" % self.host
             return []
 
@@ -69,7 +69,7 @@ class EmbyClient:
             api = requests.get(url, timeout=10)
         except OSError:
             if not self.suppress_connection_errors:
-                _LOGGER.info("Host %s is not available", self.host)
+                _LOGGER.warning("Host %s is not available", self.host)
             self._state = "%s cannot be reached" % self.host
             return
 
